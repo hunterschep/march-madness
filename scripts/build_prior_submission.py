@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Build the all-pairs fallback submission without bracket or market overrides."""
+
 import sys
 from pathlib import Path
 
@@ -14,22 +16,30 @@ from mmmania.modeling import (
     PRIOR_SPEC,
     build_pair_dataset,
     build_pair_rows_for_submission,
+    calibrate_probabilities,
     fit_final_model,
+    load_tuned_model,
+    parse_submission_ids,
     tune_model,
 )
 
+
+BACKTEST_PATH = OUTPUT_DIR / "backtests" / "rolling_backtests.json"
 
 def _predict_side(sample: pd.DataFrame, side_code: str) -> pd.DataFrame:
     side = get_side(side_code)
     team_features = build_team_season_features(side)
     pair_dataset = build_pair_dataset(side, team_features, PRIOR_SPEC)
-    tuned_model, _ = tune_model(side, pair_dataset, PRIOR_SPEC)
+    tuned_model = load_tuned_model(BACKTEST_PATH, side.label, PRIOR_SPEC.name)
+    if tuned_model is None:
+        tuned_model, _ = tune_model(side, pair_dataset, PRIOR_SPEC)
     model, _ = fit_final_model(pair_dataset, tuned_model)
 
-    side_ids = sample.loc[
-        sample["ID"].str.contains("_3") if side_code == "W" else ~sample["ID"].str.contains("_3"),
-        "ID",
-    ]
+    sample_pairs = parse_submission_ids(sample["ID"])
+    if side_code == "W":
+        side_ids = sample_pairs.loc[sample_pairs["TeamLowID"] >= 3000, "ID"]
+    else:
+        side_ids = sample_pairs.loc[sample_pairs["TeamLowID"] < 3000, "ID"]
     feature_rows = build_pair_rows_for_submission(
         side=side,
         team_features=team_features,
@@ -39,7 +49,10 @@ def _predict_side(sample: pd.DataFrame, side_code: str) -> pd.DataFrame:
     )
     probabilities = model.predict_proba(feature_rows[list(tuned_model.feature_columns)].fillna(0.0))[:, 1]
     predicted = feature_rows[["ID"]].copy()
-    predicted["Pred"] = probabilities.clip(0.001, 0.999)
+    predicted["Pred"] = calibrate_probabilities(
+        probabilities,
+        global_scale=tuned_model.global_scale,
+    )
     return predicted
 
 

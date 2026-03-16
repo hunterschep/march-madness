@@ -6,7 +6,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from mmmania.odds import american_to_implied_prob, consensus_probability, devig_two_way_probabilities
+from mmmania.odds import (
+    american_to_implied_prob,
+    consensus_probability,
+    devig_two_way_probabilities,
+)
 
 
 def test_american_to_implied_probability() -> None:
@@ -29,4 +33,3 @@ def test_consensus_probability() -> None:
         ]
     )
     assert round(probability, 4) == 0.5667
-

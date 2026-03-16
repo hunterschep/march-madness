@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Helpers for converting American odds into market probabilities."""
+
 from typing import Iterable
 
 
@@ -37,4 +39,3 @@ def consensus_probability(
     if total_weight <= 0:
         raise ValueError("Consensus requires positive total weight.")
     return weighted_sum / total_weight
-

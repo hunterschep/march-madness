@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Feature engineering from Kaggle regular-season data."""
+
 from typing import Iterable
 
 import numpy as np
@@ -89,6 +91,7 @@ def _compact_team_games(side: CompetitionSide) -> pd.DataFrame:
 
 
 def _adjusted_margin_features(side: CompetitionSide) -> pd.DataFrame:
+    """Estimate opponent-adjusted margin with a single season-wide linear system."""
     regular = _read_csv(
         f"{side.code}RegularSeasonCompactResults.csv",
         usecols=["Season", "WTeamID", "LTeamID", "WScore", "LScore", "WLoc"],
@@ -287,6 +290,7 @@ def _external_team_features(side: CompetitionSide) -> pd.DataFrame | None:
 
 
 def build_team_season_features(side: CompetitionSide) -> pd.DataFrame:
+    """Assemble one feature row per team-season from regular-season data only."""
     compact_games = _compact_team_games(side)
     detailed_games = _detailed_team_games(side)
     adjusted_margin = _adjusted_margin_features(side)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Export one-row-per-team feature snapshots for the current season."""
+
 import sys
 from pathlib import Path
 
@@ -28,4 +30,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

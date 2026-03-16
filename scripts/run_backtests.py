@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Run rolling tournament-only backtests and persist the tuned specs."""
+
 import json
 import sys
 from pathlib import Path
@@ -48,6 +50,17 @@ def main() -> None:
                 + f" via `{tuned_model.feature_columns}`"
                 + f" with `C={tuned_model.regularization_c}`"
                 + (" and seed prior" if tuned_model.use_seed_matchup_prior else "")
+                + f"; global shrink `{tuned_model.global_scale:.2f}`"
+                + (
+                    f", round scales `{tuned_model.round_bucket_scales}`"
+                    if any(scale != 1.0 for scale in tuned_model.round_bucket_scales)
+                    else ""
+                )
+                + (
+                    f", gap scales `{tuned_model.seed_gap_bucket_scales}`"
+                    if any(scale != 1.0 for scale in tuned_model.seed_gap_bucket_scales)
+                    else ""
+                )
             )
             for season_metric in top_candidates[0]["season_metrics"]:
                 report_lines.append(
