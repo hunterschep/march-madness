@@ -161,5 +161,3 @@ Silver and BPI are additional men-only external forecast sources used inside the
 `men_tournament_board_2026.csv` compares the seeded model, current submission probability, and market on posted men’s games.
 
 `matchup_lookup_2026.html` is a small self-contained browser tool that lets you type two team names and see the exact matchup probability from `live_submission_2026.csv`.
-
-Operational rule from [context/rules.md](/context/rules.md): Kaggle allows many uploads, but you must manually select the one counted submission before lock.
