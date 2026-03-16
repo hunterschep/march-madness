@@ -1,0 +1,851 @@
+{
+  "results": [
+    {
+      "model": "prior",
+      "side": "men",
+      "top_candidates": [
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.01,
+          "season_metrics": [
+            {
+              "brier": 0.2143273012857834,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.2134497707499326,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.21211515956034294,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.19685631371247445,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.14858832977312586,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.19701569859037543
+        },
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.03,
+          "season_metrics": [
+            {
+              "brier": 0.2151766348048666,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.21779317240539106,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.21372396576162375,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.19577231272805476,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.1440057878871212,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.19724083501655082
+        },
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.1,
+          "season_metrics": [
+            {
+              "brier": 0.21580483019372856,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.22102115788665266,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.21531771788757947,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.19512259925941589,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.1423283792376361,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.19786538631425785
+        },
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.3,
+          "season_metrics": [
+            {
+              "brier": 0.21606770038729653,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.22234164876993703,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.21602917700390184,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.19487852329460895,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.14188714750172984,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.19818746555617808
+        },
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 1.0,
+          "season_metrics": [
+            {
+              "brier": 0.2161749755800222,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.22286942030249773,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.21632143188522415,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.19478488051247222,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.14174225335950064,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.19832530974335633
+        }
+      ],
+      "tuned_model": {
+        "feature_columns": [
+          "adj_margin_rating_diff",
+          "recent_margin_diff",
+          "conference_net_eff_diff"
+        ],
+        "regularization_c": 0.01,
+        "side": "men",
+        "spec": "prior",
+        "use_seed_matchup_prior": false,
+        "weighted_brier": 0.19701569859037543
+      }
+    },
+    {
+      "model": "seeded",
+      "side": "men",
+      "top_candidates": [
+        {
+          "candidate": "seed_prior_adj_core",
+          "feature_columns": [
+            "seed_matchup_prior",
+            "seed_num_diff",
+            "adj_margin_rating_diff",
+            "recent_margin_diff"
+          ],
+          "regularization_c": 0.01,
+          "season_metrics": [
+            {
+              "brier": 0.2102739740773828,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.20583940342198848,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.21872019781487675,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.18336930335860221,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.14957763689476966,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": true,
+          "weighted_brier": 0.19350604960764414
+        },
+        {
+          "candidate": "seed_prior_adj_plus_conf",
+          "feature_columns": [
+            "seed_matchup_prior",
+            "seed_num_diff",
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.01,
+          "season_metrics": [
+            {
+              "brier": 0.21092095836074978,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.20534080197415003,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.21863369663542037,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.1845269906962482,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.1491708439470531,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": true,
+          "weighted_brier": 0.1936671544303949
+        },
+        {
+          "candidate": "seed_prior_adj_core",
+          "feature_columns": [
+            "seed_matchup_prior",
+            "seed_num_diff",
+            "adj_margin_rating_diff",
+            "recent_margin_diff"
+          ],
+          "regularization_c": 0.03,
+          "season_metrics": [
+            {
+              "brier": 0.20824042182958502,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.20539743587536236,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.22611467896580786,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.18198242910691456,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.14773959092398975,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": true,
+          "weighted_brier": 0.1938519607101246
+        },
+        {
+          "candidate": "seed_prior_adj_plus_conf",
+          "feature_columns": [
+            "seed_matchup_prior",
+            "seed_num_diff",
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.03,
+          "season_metrics": [
+            {
+              "brier": 0.20818021152714933,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.205626974609628,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.226139716598159,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.18174542885050912,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.1479994507929071,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": true,
+          "weighted_brier": 0.19389571619108525
+        },
+        {
+          "candidate": "seed_prior_adj_plus_conf",
+          "feature_columns": [
+            "seed_matchup_prior",
+            "seed_num_diff",
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.1,
+          "season_metrics": [
+            {
+              "brier": 0.20580469751094757,
+              "games": 66,
+              "season": 2021
+            },
+            {
+              "brier": 0.20613525711982644,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.23484759139440636,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.17978462974685416,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.14815110151446903,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": true,
+          "weighted_brier": 0.1949121403613317
+        }
+      ],
+      "tuned_model": {
+        "feature_columns": [
+          "seed_matchup_prior",
+          "seed_num_diff",
+          "adj_margin_rating_diff",
+          "recent_margin_diff"
+        ],
+        "regularization_c": 0.01,
+        "side": "men",
+        "spec": "seeded",
+        "use_seed_matchup_prior": true,
+        "weighted_brier": 0.19350604960764414
+      }
+    },
+    {
+      "model": "prior",
+      "side": "women",
+      "top_candidates": [
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 3.0,
+          "season_metrics": [
+            {
+              "brier": 0.1349495115015726,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.15812643962394443,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.174407451912221,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.12355016498217546,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.12213573576423938,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.14272672298348021
+        },
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 1.0,
+          "season_metrics": [
+            {
+              "brier": 0.13498169803939816,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.15829677018071026,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.17411033918000393,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.12356317258333936,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.12229337292939647,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.14274172765257773
+        },
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.3,
+          "season_metrics": [
+            {
+              "brier": 0.1351160362636117,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.15882013415475105,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.17320677051397415,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.12365459716153093,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.12281283474729726,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.14281399043898374
+        },
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.1,
+          "season_metrics": [
+            {
+              "brier": 0.13559620929267283,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.1599057895133607,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.17139167762218663,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.12415687415949711,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.12408366661759967,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.1431166396241255
+        },
+        {
+          "candidate": "adj_core",
+          "feature_columns": [
+            "adj_margin_rating_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.03,
+          "season_metrics": [
+            {
+              "brier": 0.1375600458875382,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.16198637792762743,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.16862151708502213,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.1266993563910963,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.12725313583989875,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.1445070357590305
+        }
+      ],
+      "tuned_model": {
+        "feature_columns": [
+          "adj_margin_rating_diff",
+          "recent_margin_diff",
+          "conference_net_eff_diff"
+        ],
+        "regularization_c": 3.0,
+        "side": "women",
+        "spec": "prior",
+        "use_seed_matchup_prior": false,
+        "weighted_brier": 0.14272672298348021
+      }
+    },
+    {
+      "model": "seeded",
+      "side": "women",
+      "top_candidates": [
+        {
+          "candidate": "seed_core",
+          "feature_columns": [
+            "seed_num_diff",
+            "net_eff_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 3.0,
+          "season_metrics": [
+            {
+              "brier": 0.1517716076929929,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.16450744480658538,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.16266720025894155,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.11195872412703826,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.1114606180834853,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.14033658136602398
+        },
+        {
+          "candidate": "seed_core",
+          "feature_columns": [
+            "seed_num_diff",
+            "net_eff_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 1.0,
+          "season_metrics": [
+            {
+              "brier": 0.15174200110789918,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.16443858393613167,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.16253281363268898,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.11205783260829674,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.11159838652437573,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.14033775344047641
+        },
+        {
+          "candidate": "seed_core",
+          "feature_columns": [
+            "seed_num_diff",
+            "net_eff_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.3,
+          "season_metrics": [
+            {
+              "brier": 0.15163966614807092,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.16420609035262068,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.16210259584932785,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.11240451648246597,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.11206365961145161,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.14034848562281418
+        },
+        {
+          "candidate": "seed_core",
+          "feature_columns": [
+            "seed_num_diff",
+            "net_eff_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.1,
+          "season_metrics": [
+            {
+              "brier": 0.15139559135057523,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.1636239357605719,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.1611396785673011,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.11338594003216672,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.11327430391100089,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.14043299323035033
+        },
+        {
+          "candidate": "seed_core",
+          "feature_columns": [
+            "seed_num_diff",
+            "net_eff_diff",
+            "recent_margin_diff",
+            "conference_net_eff_diff"
+          ],
+          "regularization_c": 0.03,
+          "season_metrics": [
+            {
+              "brier": 0.15097074298158095,
+              "games": 63,
+              "season": 2021
+            },
+            {
+              "brier": 0.16234076400145694,
+              "games": 67,
+              "season": 2022
+            },
+            {
+              "brier": 0.15943051289159993,
+              "games": 67,
+              "season": 2023
+            },
+            {
+              "brier": 0.11663183764217103,
+              "games": 67,
+              "season": 2024
+            },
+            {
+              "brier": 0.11670542001069345,
+              "games": 67,
+              "season": 2025
+            }
+          ],
+          "use_seed_matchup_prior": false,
+          "weighted_brier": 0.1410979716689315
+        }
+      ],
+      "tuned_model": {
+        "feature_columns": [
+          "seed_num_diff",
+          "net_eff_diff",
+          "recent_margin_diff",
+          "conference_net_eff_diff"
+        ],
+        "regularization_c": 3.0,
+        "side": "women",
+        "spec": "seeded",
+        "use_seed_matchup_prior": false,
+        "weighted_brier": 0.14033658136602398
+      }
+    }
+  ]
+}
