@@ -1,0 +1,125 @@
+{
+  "aggressiveness": 1.01,
+  "backend": "xgboost",
+  "calibration_mode": "by_gender",
+  "men_brier": 0.18570069667880393,
+  "num_models": 22,
+  "output_path": "/Users/hunterschep/march-madness/outputs/submissions/prior_submission_2026.csv",
+  "overall_brier": 0.16796011063285587,
+  "prediction_rows": 132133,
+  "season": 2026,
+  "season_metrics": [
+    {
+      "games": 128,
+      "overall_brier": 0.1823538018126327,
+      "season": 2003
+    },
+    {
+      "games": 128,
+      "overall_brier": 0.16986005460911466,
+      "season": 2004
+    },
+    {
+      "games": 128,
+      "overall_brier": 0.17036256464342175,
+      "season": 2005
+    },
+    {
+      "games": 128,
+      "overall_brier": 0.1977400048751145,
+      "season": 2006
+    },
+    {
+      "games": 128,
+      "overall_brier": 0.13848349454149445,
+      "season": 2007
+    },
+    {
+      "games": 128,
+      "overall_brier": 0.15507102741314363,
+      "season": 2008
+    },
+    {
+      "games": 128,
+      "overall_brier": 0.16432450751591737,
+      "season": 2009
+    },
+    {
+      "games": 254,
+      "overall_brier": 0.16631626090501642,
+      "season": 2010
+    },
+    {
+      "games": 260,
+      "overall_brier": 0.1802203988353762,
+      "season": 2011
+    },
+    {
+      "games": 260,
+      "overall_brier": 0.15912639702068307,
+      "season": 2012
+    },
+    {
+      "games": 260,
+      "overall_brier": 0.1795945152312883,
+      "season": 2013
+    },
+    {
+      "games": 260,
+      "overall_brier": 0.17976735680787406,
+      "season": 2014
+    },
+    {
+      "games": 260,
+      "overall_brier": 0.14465896200052322,
+      "season": 2015
+    },
+    {
+      "games": 260,
+      "overall_brier": 0.18128593565818402,
+      "season": 2016
+    },
+    {
+      "games": 260,
+      "overall_brier": 0.16208814136392322,
+      "season": 2017
+    },
+    {
+      "games": 260,
+      "overall_brier": 0.1801325993929368,
+      "season": 2018
+    },
+    {
+      "games": 260,
+      "overall_brier": 0.1471272876254374,
+      "season": 2019
+    },
+    {
+      "games": 258,
+      "overall_brier": 0.18466362872272504,
+      "season": 2021
+    },
+    {
+      "games": 268,
+      "overall_brier": 0.1885177185467174,
+      "season": 2022
+    },
+    {
+      "games": 268,
+      "overall_brier": 0.1825258150319659,
+      "season": 2023
+    },
+    {
+      "games": 268,
+      "overall_brier": 0.15411602124216342,
+      "season": 2024
+    },
+    {
+      "games": 268,
+      "overall_brier": 0.1286865423956526,
+      "season": 2025
+    }
+  ],
+  "validation": "loso",
+  "women_brier": 0.14121077745847638
+}

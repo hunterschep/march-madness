@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-"""Export a readable board comparing men’s posted-game market and model probabilities."""
+"""Export a readable board comparing the modeh7 baseline, live submission, and market."""
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -10,20 +11,12 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from mmmania.config import DATA_DIR, INPUT_DIR, OUTPUT_DIR, ensure_output_dirs, get_side
-from mmmania.features import build_team_season_features
-from mmmania.modeling import (
-    SEEDED_SPEC,
-    apply_seed_matchup_prior,
-    build_pair_round_lookup,
-    build_pair_dataset,
-    build_pair_rows_for_submission,
-    calibrate_probabilities,
-    fit_final_model,
-    load_tuned_model,
-    round_bucket_from_round_number,
-    seed_gap_bucket,
-    tune_model,
+from mmmania.config import DATA_DIR, INPUT_DIR, OUTPUT_DIR, ensure_output_dirs
+from mmmania.modeh7 import (
+    MODEH7_DEFAULT_AGGRESSIVENESS,
+    MODEH7_DEFAULT_CALIBRATION_MODE,
+    MODEH7_DEFAULT_VALIDATION,
+    generate_modeh7_submission,
 )
 from mmmania.silver import load_men_silver_probabilities
 
@@ -31,9 +24,35 @@ from mmmania.silver import load_men_silver_probabilities
 SEASON = 2026
 CONSENSUS_PATH = OUTPUT_DIR / "markets" / "market_consensus.csv"
 MONEYLINE_PATH = INPUT_DIR / "odds" / "tournament_moneylines.csv"
-BACKTEST_PATH = OUTPUT_DIR / "backtests" / "rolling_backtests.json"
+PRIOR_PATH = OUTPUT_DIR / "submissions" / "prior_submission_2026.csv"
 LIVE_SUBMISSION_PATH = OUTPUT_DIR / "submissions" / "live_submission_2026.csv"
 OUTPUT_PATH = OUTPUT_DIR / "markets" / "men_tournament_board_2026.csv"
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--prior-path",
+        type=Path,
+        default=PRIOR_PATH,
+        help="Path to the model-only prior submission CSV.",
+    )
+    parser.add_argument(
+        "--refresh-prior",
+        action="store_true",
+        help="Rebuild modeh7 predictions inline for the board instead of reusing the saved prior CSV.",
+    )
+    parser.add_argument(
+        "--refresh-cache",
+        action="store_true",
+        help="Rebuild the cached modeh7 feature tables while generating inline predictions.",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable the modeh7 feature-table cache while generating inline predictions.",
+    )
+    return parser.parse_args()
 
 
 def _load_market_pairs() -> pd.DataFrame:
@@ -67,51 +86,54 @@ def _load_market_pairs() -> pd.DataFrame:
     return extras
 
 
+def _load_or_build_model_predictions(
+    ids: pd.Series,
+    *,
+    prior_path: Path,
+    refresh_prior: bool,
+    use_cache: bool,
+    refresh_cache: bool,
+) -> pd.DataFrame:
+    ids = pd.Series(ids, copy=False, name="ID")
+    if prior_path.exists() and not refresh_prior:
+        model = pd.read_csv(prior_path)[["ID", "Pred"]].copy()
+    else:
+        model, _ = generate_modeh7_submission(
+            ids,
+            validation=MODEH7_DEFAULT_VALIDATION,
+            calibration_mode=MODEH7_DEFAULT_CALIBRATION_MODE,
+            use_cache=use_cache,
+            refresh_cache=refresh_cache,
+            aggressiveness=MODEH7_DEFAULT_AGGRESSIVENESS,
+        )
+
+    model = (
+        model.rename(columns={"Pred": "model_p_low"})
+        .set_index("ID")
+        .reindex(ids)
+        .reset_index()
+    )
+    if model["model_p_low"].isna().any():
+        missing_count = int(model["model_p_low"].isna().sum())
+        raise ValueError(f"Modeh7 model predictions are missing {missing_count} board rows.")
+    return model
+
+
 def main() -> None:
     ensure_output_dirs()
+    args = _parse_args()
 
     market_pairs = _load_market_pairs()
     ids = market_pairs.apply(
         lambda row: f"{SEASON}_{int(row['team_low_id'])}_{int(row['team_high_id'])}",
         axis=1,
-    )
-
-    side = get_side("M")
-    team_features = build_team_season_features(side)
-    pair_dataset = build_pair_dataset(side, team_features, SEEDED_SPEC)
-    tuned_model = load_tuned_model(BACKTEST_PATH, side.label, SEEDED_SPEC.name)
-    if tuned_model is None:
-        tuned_model, _ = tune_model(side, pair_dataset, SEEDED_SPEC)
-    model, seed_prior_payload = fit_final_model(pair_dataset, tuned_model)
-
-    feature_rows = build_pair_rows_for_submission(
-        side=side,
-        team_features=team_features,
-        season=SEASON,
-        spec=SEEDED_SPEC,
-        ids=ids,
-    )
-    if tuned_model.use_seed_matchup_prior:
-        feature_rows = apply_seed_matchup_prior(feature_rows, seed_prior_payload)
-
-    pair_round_lookup = build_pair_round_lookup("M", SEASON)
-    raw_probabilities = model.predict_proba(
-        feature_rows[list(tuned_model.feature_columns)].fillna(0.0)
-    )[:, 1]
-    round_buckets = feature_rows.apply(
-        lambda row: round_bucket_from_round_number(
-            pair_round_lookup.get(f"{int(row['TeamLowID'])}_{int(row['TeamHighID'])}")
-        ),
-        axis=1,
-    )
-    seed_gap_buckets = feature_rows["seed_gap"].map(seed_gap_bucket)
-    feature_rows["model_p_low"] = calibrate_probabilities(
-        raw_probabilities,
-        global_scale=tuned_model.global_scale,
-        round_buckets=round_buckets,
-        round_bucket_scales=tuned_model.round_bucket_scales,
-        seed_gap_buckets=seed_gap_buckets,
-        seed_gap_bucket_scales=tuned_model.seed_gap_bucket_scales,
+    ).rename("ID")
+    model_rows = _load_or_build_model_predictions(
+        ids,
+        prior_path=args.prior_path,
+        refresh_prior=args.refresh_prior,
+        use_cache=not args.no_cache,
+        refresh_cache=args.refresh_cache,
     )
 
     teams = pd.read_csv(DATA_DIR / "MTeams.csv", usecols=["TeamID", "TeamName"])
@@ -125,12 +147,8 @@ def main() -> None:
     favorite_names = teams.rename(columns={"TeamID": "favorite_team_id", "TeamName": "favorite_team_name"})
 
     board = (
-        market_pairs.merge(
-            feature_rows[["ID", "TeamLowID", "TeamHighID", "model_p_low"]],
-            left_on=["team_low_id", "team_high_id"],
-            right_on=["TeamLowID", "TeamHighID"],
-            how="left",
-        )
+        market_pairs.assign(ID=ids)
+        .merge(model_rows, on="ID", how="left")
         .merge(low_teams, on="team_low_id", how="left")
         .merge(high_teams, on="team_high_id", how="left")
         .merge(low_seeds[["team_low_id", "seed_low"]], on="team_low_id", how="left")

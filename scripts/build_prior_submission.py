@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-"""Build the all-pairs fallback submission without bracket or market overrides."""
+"""Build the notebook-style all-pairs submission baseline."""
 
+import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -10,66 +12,81 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from mmmania.config import DATA_DIR, OUTPUT_DIR, ensure_output_dirs, get_side
-from mmmania.features import build_team_season_features
-from mmmania.modeling import (
-    PRIOR_SPEC,
-    build_pair_dataset,
-    build_pair_rows_for_submission,
-    calibrate_probabilities,
-    fit_final_model,
-    load_tuned_model,
-    parse_submission_ids,
-    tune_model,
+from mmmania.config import DATA_DIR, OUTPUT_DIR, ensure_output_dirs
+from mmmania.modeh7 import (
+    MODEH7_DEFAULT_AGGRESSIVENESS,
+    MODEH7_DEFAULT_CALIBRATION_MODE,
+    MODEH7_DEFAULT_VALIDATION,
+    generate_modeh7_submission,
 )
 
 
-BACKTEST_PATH = OUTPUT_DIR / "backtests" / "rolling_backtests.json"
+SEASON = 2026
+OUTPUT_PATH = OUTPUT_DIR / "submissions" / "prior_submission_2026.csv"
+SUMMARY_PATH = OUTPUT_DIR / "reports" / "prior_submission_summary_2026.json"
 
-def _predict_side(sample: pd.DataFrame, side_code: str) -> pd.DataFrame:
-    side = get_side(side_code)
-    team_features = build_team_season_features(side)
-    pair_dataset = build_pair_dataset(side, team_features, PRIOR_SPEC)
-    tuned_model = load_tuned_model(BACKTEST_PATH, side.label, PRIOR_SPEC.name)
-    if tuned_model is None:
-        tuned_model, _ = tune_model(side, pair_dataset, PRIOR_SPEC)
-    model, _ = fit_final_model(pair_dataset, tuned_model)
 
-    sample_pairs = parse_submission_ids(sample["ID"])
-    if side_code == "W":
-        side_ids = sample_pairs.loc[sample_pairs["TeamLowID"] >= 3000, "ID"]
-    else:
-        side_ids = sample_pairs.loc[sample_pairs["TeamLowID"] < 3000, "ID"]
-    feature_rows = build_pair_rows_for_submission(
-        side=side,
-        team_features=team_features,
-        season=2026,
-        spec=PRIOR_SPEC,
-        ids=side_ids,
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--validation",
+        choices=["loso", "rolling"],
+        default=MODEH7_DEFAULT_VALIDATION,
+        help="Training / OOF scheme used for the ensemble and calibrator.",
     )
-    probabilities = model.predict_proba(feature_rows[list(tuned_model.feature_columns)].fillna(0.0))[:, 1]
-    predicted = feature_rows[["ID"]].copy()
-    predicted["Pred"] = calibrate_probabilities(
-        probabilities,
-        global_scale=tuned_model.global_scale,
+    parser.add_argument(
+        "--calibration-mode",
+        choices=["combined", "by_gender"],
+        default=MODEH7_DEFAULT_CALIBRATION_MODE,
+        help="Probability calibration strategy.",
     )
-    return predicted
+    parser.add_argument(
+        "--aggressiveness",
+        type=float,
+        default=MODEH7_DEFAULT_AGGRESSIVENESS,
+        help="Multiplier applied to predicted margins before calibration.",
+    )
+    parser.add_argument(
+        "--refresh-cache",
+        action="store_true",
+        help="Rebuild the cached feature tables instead of reusing them.",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable the modeh7 feature-table cache.",
+    )
+    return parser.parse_args()
 
 
 def main() -> None:
     ensure_output_dirs()
+    args = _parse_args()
 
     sample = pd.read_csv(DATA_DIR / "SampleSubmissionStage2.csv")
-    men = _predict_side(sample, "M")
-    women = _predict_side(sample, "W")
+    submission, summary = generate_modeh7_submission(
+        sample["ID"],
+        validation=args.validation,
+        calibration_mode=args.calibration_mode,
+        use_cache=not args.no_cache,
+        refresh_cache=args.refresh_cache,
+        aggressiveness=args.aggressiveness,
+    )
 
     submission = (
-        pd.concat([men, women], ignore_index=True)
-        .set_index("ID")
+        submission.set_index("ID")
         .reindex(sample["ID"])
         .reset_index()
     )
-    submission.to_csv(OUTPUT_DIR / "submissions" / "prior_submission_2026.csv", index=False)
+    submission["Pred"] = submission["Pred"].round(6)
+    submission.to_csv(OUTPUT_PATH, index=False)
+
+    payload = {
+        "season": SEASON,
+        "output_path": str(OUTPUT_PATH),
+        **summary,
+    }
+    SUMMARY_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 if __name__ == "__main__":

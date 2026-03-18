@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-"""Assemble the current competition-ready submission with model and market layers."""
+"""Assemble the competition submission from the modeh7 baseline and live men overlays."""
 
-
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -13,22 +13,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from mmmania.config import DATA_DIR, INPUT_DIR, OUTPUT_DIR, ensure_output_dirs, get_side
-from mmmania.features import build_team_season_features, get_tournament_seeds
-from mmmania.modeling import (
-    PRIOR_SPEC,
-    SEEDED_SPEC,
-    apply_seed_matchup_prior,
-    build_pair_round_lookup,
-    build_pair_dataset,
-    build_pair_rows_for_submission,
-    calibrate_probabilities,
-    fit_final_model,
-    load_tuned_model,
-    parse_submission_ids,
-    round_bucket_from_round_number,
-    seed_gap_bucket,
-    tune_model,
+from mmmania.features import get_tournament_seeds
+from mmmania.modeh7 import (
+    MODEH7_DEFAULT_AGGRESSIVENESS,
+    MODEH7_DEFAULT_CALIBRATION_MODE,
+    MODEH7_DEFAULT_VALIDATION,
+    generate_modeh7_submission,
 )
+from mmmania.modeling import parse_submission_ids
 from mmmania.silver import (
     load_men_silver_probabilities,
     silver_direct_share_for_round,
@@ -38,11 +30,38 @@ from mmmania.tournament import fit_pair_probability_ratings, pair_probability_fr
 
 
 SEASON = 2026
-BACKTEST_PATH = OUTPUT_DIR / "backtests" / "rolling_backtests.json"
 MARKET_PATH = OUTPUT_DIR / "markets" / "market_consensus.csv"
 BPI_PATH = INPUT_DIR / "odds" / "men_bpi_probabilities.csv"
+PRIOR_PATH = OUTPUT_DIR / "submissions" / "prior_submission_2026.csv"
+PRIOR_SUMMARY_PATH = OUTPUT_DIR / "reports" / "prior_submission_summary_2026.json"
 OUTPUT_PATH = OUTPUT_DIR / "submissions" / "live_submission_2026.csv"
 SUMMARY_PATH = OUTPUT_DIR / "reports" / "live_submission_summary_2026.json"
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--prior-path",
+        type=Path,
+        default=PRIOR_PATH,
+        help="Path to the model-only prior submission CSV.",
+    )
+    parser.add_argument(
+        "--refresh-prior",
+        action="store_true",
+        help="Rebuild the modeh7 prior instead of reusing the saved CSV.",
+    )
+    parser.add_argument(
+        "--refresh-cache",
+        action="store_true",
+        help="Rebuild the cached modeh7 feature tables while generating an inline prior.",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable the modeh7 feature-table cache while generating an inline prior.",
+    )
+    return parser.parse_args()
 
 
 def _market_weight(row: pd.Series) -> float:
@@ -59,6 +78,77 @@ def _weighted_mse(errors: pd.Series, weights: pd.Series | None = None) -> float:
     if total_weight <= 0:
         return float((errors**2).mean())
     return float(((errors**2) * weights).sum() / total_weight)
+
+
+def _load_or_build_prior(
+    sample_ids: pd.Series,
+    *,
+    prior_path: Path,
+    refresh_prior: bool,
+    use_cache: bool,
+    refresh_cache: bool,
+) -> tuple[pd.DataFrame, dict]:
+    if prior_path.exists() and not refresh_prior:
+        prior = pd.read_csv(prior_path)[["ID", "Pred"]].copy()
+        summary: dict = {
+            "source": "file",
+            "path": str(prior_path),
+        }
+        if PRIOR_SUMMARY_PATH.exists():
+            try:
+                summary["saved_summary"] = json.loads(PRIOR_SUMMARY_PATH.read_text())
+            except json.JSONDecodeError:
+                summary["saved_summary"] = {"error": f"Could not parse {PRIOR_SUMMARY_PATH.name}"}
+        saved = summary.get("saved_summary", {})
+        if saved.get("backend") != "xgboost":
+            raise ValueError(
+                "The saved prior was not produced with backend=xgboost. "
+                "Re-run python scripts/build_prior_submission.py or use --refresh-prior."
+            )
+    else:
+        prior, model_summary = generate_modeh7_submission(
+            sample_ids,
+            validation=MODEH7_DEFAULT_VALIDATION,
+            calibration_mode=MODEH7_DEFAULT_CALIBRATION_MODE,
+            use_cache=use_cache,
+            refresh_cache=refresh_cache,
+            aggressiveness=MODEH7_DEFAULT_AGGRESSIVENESS,
+        )
+        prior_to_write = (
+            prior.set_index("ID")
+            .reindex(sample_ids)
+            .reset_index()
+        )
+        prior_to_write["Pred"] = prior_to_write["Pred"].round(6)
+        prior_path.parent.mkdir(parents=True, exist_ok=True)
+        prior_to_write.to_csv(prior_path, index=False)
+        PRIOR_SUMMARY_PATH.write_text(
+            json.dumps(
+                {
+                    "season": SEASON,
+                    "output_path": str(prior_path),
+                    **model_summary,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
+        summary = {
+            "source": "inline_rebuild",
+            "path": str(prior_path),
+            "saved_summary": model_summary,
+        }
+
+    prior = (
+        prior.set_index("ID")
+        .reindex(sample_ids)
+        .reset_index()
+    )
+    if prior["Pred"].isna().any():
+        missing_count = int(prior["Pred"].isna().sum())
+        raise ValueError(f"Prior submission is missing {missing_count} IDs needed for the live build.")
+    return prior, summary
 
 
 def _load_bpi_probabilities() -> pd.DataFrame:
@@ -104,37 +194,8 @@ def _load_silver_probabilities() -> pd.DataFrame:
     return silver
 
 
-def _apply_tuned_calibration(
-    frame: pd.DataFrame,
-    probabilities: pd.Series,
-    tuned_model,
-    pair_round_lookup: dict[str, int] | None = None,
-) -> pd.Series:
-    round_buckets = None
-    if pair_round_lookup is not None:
-        round_buckets = frame.apply(
-            lambda row: round_bucket_from_round_number(
-                pair_round_lookup.get(f"{int(row['TeamLowID'])}_{int(row['TeamHighID'])}")
-            ),
-            axis=1,
-        )
-
-    seed_gap_buckets = None
-    if "seed_gap" in frame.columns:
-        seed_gap_buckets = frame["seed_gap"].map(seed_gap_bucket)
-
-    return calibrate_probabilities(
-        probabilities,
-        global_scale=tuned_model.global_scale,
-        round_buckets=round_buckets,
-        round_bucket_scales=tuned_model.round_bucket_scales,
-        seed_gap_buckets=seed_gap_buckets,
-        seed_gap_bucket_scales=tuned_model.seed_gap_bucket_scales,
-    )
-
-
 def _men_tournament_layer_from_weights(
-    seeded_lookup: pd.DataFrame,
+    model_lookup: pd.DataFrame,
     market: pd.DataFrame,
     bpi: pd.DataFrame,
     silver: pd.DataFrame,
@@ -146,7 +207,7 @@ def _men_tournament_layer_from_weights(
     silver_round64_observation_weight: float,
     latent_blend: float,
 ) -> pd.DataFrame:
-    observations = seeded_lookup.rename(
+    observations = model_lookup.rename(
         columns={
             "TeamLowID": "team_low_id",
             "TeamHighID": "team_high_id",
@@ -184,7 +245,7 @@ def _men_tournament_layer_from_weights(
         observations = pd.concat([observations, silver_rows], ignore_index=True)
 
     ratings = fit_pair_probability_ratings(tournament_team_ids, observations)
-    men_layer = seeded_lookup.copy()
+    men_layer = model_lookup.copy()
     men_layer["latent_pred"] = men_layer.apply(
         lambda row: pair_probability_from_ratings(row["TeamLowID"], row["TeamHighID"], ratings),
         axis=1,
@@ -194,7 +255,7 @@ def _men_tournament_layer_from_weights(
 
 
 def _tune_men_tournament_layer_weights(
-    seeded_lookup: pd.DataFrame,
+    model_lookup: pd.DataFrame,
     market: pd.DataFrame,
     bpi: pd.DataFrame,
     silver: pd.DataFrame,
@@ -209,7 +270,7 @@ def _tune_men_tournament_layer_weights(
             "latent_blend": 0.75,
         }
         return weights, _men_tournament_layer_from_weights(
-            seeded_lookup,
+            model_lookup,
             market,
             bpi,
             silver,
@@ -241,7 +302,7 @@ def _tune_men_tournament_layer_weights(
                             "latent_blend": latent_blend,
                         }
                         layer = _men_tournament_layer_from_weights(
-                            seeded_lookup,
+                            model_lookup,
                             market,
                             bpi,
                             silver,
@@ -279,10 +340,7 @@ def _tune_men_tournament_layer_weights(
                                         silver_score_weights,
                                     )
                                 )
-                        if not score_components:
-                            score = 0.0
-                        else:
-                            score = sum(score_components)
+                        score = 0.0 if not score_components else sum(score_components)
                         if best_score is None or score < best_score:
                             best_score = score
                             best_weights = weights
@@ -294,7 +352,7 @@ def _tune_men_tournament_layer_weights(
 
 
 def _men_tournament_probability_layer(
-    seeded_lookup: pd.DataFrame,
+    model_lookup: pd.DataFrame,
     market: pd.DataFrame,
     tournament_team_ids: set[int],
 ) -> tuple[pd.DataFrame, dict, pd.DataFrame]:
@@ -302,7 +360,7 @@ def _men_tournament_probability_layer(
     bpi = _load_bpi_probabilities()
     silver = _load_silver_probabilities()
     weights, men_layer = _tune_men_tournament_layer_weights(
-        seeded_lookup,
+        model_lookup,
         market,
         bpi,
         silver,
@@ -311,83 +369,37 @@ def _men_tournament_probability_layer(
     return men_layer, weights, silver
 
 
-def _predict_side(sample_pairs: pd.DataFrame, side_code: str) -> tuple[pd.DataFrame, dict]:
+def _predict_side(
+    sample_pairs: pd.DataFrame,
+    prior_predictions: pd.DataFrame,
+    side_code: str,
+) -> tuple[pd.DataFrame, dict]:
     side = get_side(side_code)
     side_mask = sample_pairs["TeamLowID"] >= 3000 if side_code == "W" else sample_pairs["TeamLowID"] < 3000
     side_pairs = sample_pairs.loc[side_mask, ["ID", "Season", "TeamLowID", "TeamHighID"]].copy()
-    team_features = build_team_season_features(side)
-    pair_round_lookup = build_pair_round_lookup(side_code, SEASON) if side_code in {"M", "W"} else {}
 
-    prior_dataset = build_pair_dataset(side, team_features, PRIOR_SPEC)
-    prior_tuned = load_tuned_model(BACKTEST_PATH, side.label, PRIOR_SPEC.name)
-    if prior_tuned is None:
-        prior_tuned, _ = tune_model(side, prior_dataset, PRIOR_SPEC)
-    prior_model, _ = fit_final_model(prior_dataset, prior_tuned)
+    side_pred = side_pairs.merge(prior_predictions, on="ID", how="left")
+    if side_pred["Pred"].isna().any():
+        missing_count = int(side_pred["Pred"].isna().sum())
+        raise ValueError(f"Modeh7 prior is missing {missing_count} {side.label} rows.")
 
-    prior_rows = build_pair_rows_for_submission(
-        side=side,
-        team_features=team_features,
-        season=SEASON,
-        spec=PRIOR_SPEC,
-        ids=side_pairs["ID"],
+    tournament_team_ids = set(
+        get_tournament_seeds(side).loc[lambda frame: frame["Season"] == SEASON, "TeamID"]
     )
-    side_pred = prior_rows[["ID"]].copy()
-    prior_probabilities = pd.Series(
-        prior_model.predict_proba(
-            prior_rows[list(prior_tuned.feature_columns)].fillna(0.0)
-        )[:, 1]
+    tournament_mask = side_pairs["TeamLowID"].isin(tournament_team_ids) & side_pairs["TeamHighID"].isin(
+        tournament_team_ids
     )
-    side_pred["Pred"] = _apply_tuned_calibration(
-        prior_rows,
-        prior_probabilities,
-        prior_tuned,
-        pair_round_lookup=None,
-    )
-
-    tournament_team_ids = set(get_tournament_seeds(side).loc[lambda frame: frame["Season"] == SEASON, "TeamID"])
-    tournament_mask = side_pairs["TeamLowID"].isin(tournament_team_ids) & side_pairs["TeamHighID"].isin(tournament_team_ids)
-    tournament_ids = side_pairs.loc[tournament_mask, "ID"]
 
     summary = {
         "side": side.label,
-        "prior_rows": int(len(side_pred)),
-        "seeded_overrides": 0,
+        "base_model": "modeh7",
+        "base_rows": int(len(side_pred)),
+        "latent_layer_rows": 0,
         "market_overrides": 0,
     }
 
-    seeded_lookup = None
-    if not tournament_ids.empty:
-        seeded_dataset = build_pair_dataset(side, team_features, SEEDED_SPEC)
-        seeded_tuned = load_tuned_model(BACKTEST_PATH, side.label, SEEDED_SPEC.name)
-        if seeded_tuned is None:
-            seeded_tuned, _ = tune_model(side, seeded_dataset, SEEDED_SPEC)
-        seeded_model, seed_prior_payload = fit_final_model(seeded_dataset, seeded_tuned)
-
-        seeded_rows = build_pair_rows_for_submission(
-            side=side,
-            team_features=team_features,
-            season=SEASON,
-            spec=SEEDED_SPEC,
-            ids=tournament_ids,
-        )
-        if seeded_tuned.use_seed_matchup_prior:
-            seeded_rows = apply_seed_matchup_prior(seeded_rows, seed_prior_payload)
-
-        seeded_lookup = seeded_rows[["ID"]].copy()
-        seeded_lookup["TeamLowID"] = seeded_rows["TeamLowID"].to_numpy()
-        seeded_lookup["TeamHighID"] = seeded_rows["TeamHighID"].to_numpy()
-        seeded_lookup["seed_gap"] = seeded_rows["seed_gap"].to_numpy()
-        seeded_probabilities = pd.Series(
-            seeded_model.predict_proba(
-                seeded_rows[list(seeded_tuned.feature_columns)].fillna(0.0)
-            )[:, 1]
-        )
-        seeded_lookup["Pred"] = _apply_tuned_calibration(
-            seeded_rows,
-            seeded_probabilities,
-            seeded_tuned,
-            pair_round_lookup=pair_round_lookup,
-        )
+    if side_code == "M":
+        model_lookup = side_pred.loc[tournament_mask, ["ID", "TeamLowID", "TeamHighID", "Pred"]].copy()
 
         market = pd.DataFrame()
         if MARKET_PATH.exists():
@@ -401,55 +413,52 @@ def _predict_side(sample_pairs: pd.DataFrame, side_code: str) -> tuple[pd.DataFr
                 market["market_weight"] = market.apply(_market_weight, axis=1)
                 market = market[market["market_weight"] > 0].copy()
 
-        silver = pd.DataFrame()
-        if side_code == "M":
-            seeded_lookup, men_layer_weights, silver = _men_tournament_probability_layer(
-                seeded_lookup,
-                market,
-                tournament_team_ids,
-            )
-            men_layer_weights["silver_market_direct_share_first_four"] = 0.15
-            men_layer_weights["silver_market_direct_share_round64"] = 0.35
-            men_layer_weights["silver_only_direct_share_first_four"] = 0.35
-            men_layer_weights["silver_only_direct_share_round64"] = 0.60
-            summary["men_layer_weights"] = men_layer_weights
-            summary["silver_rows"] = int(len(silver))
+        model_lookup, men_layer_weights, silver = _men_tournament_probability_layer(
+            model_lookup,
+            market,
+            tournament_team_ids,
+        )
+        men_layer_weights["silver_market_direct_share_first_four"] = 0.15
+        men_layer_weights["silver_market_direct_share_round64"] = 0.35
+        men_layer_weights["silver_only_direct_share_first_four"] = 0.35
+        men_layer_weights["silver_only_direct_share_round64"] = 0.60
+        summary["men_layer_weights"] = men_layer_weights
+        summary["silver_rows"] = int(len(silver))
 
-            if not silver.empty:
-                silver = silver.copy()
-                silver["has_market"] = silver["ID"].isin(set(market["ID"])) if not market.empty else False
-
-                silver_only = silver[~silver["has_market"]].copy()
-                if not silver_only.empty:
-                    silver_only = silver_only.merge(
-                        seeded_lookup[["ID", "Pred"]].rename(columns={"Pred": "model_pred"}),
-                        on="ID",
-                        how="left",
+        if not silver.empty:
+            silver = silver.copy()
+            silver["has_market"] = silver["ID"].isin(set(market["ID"])) if not market.empty else False
+            silver_only = silver[~silver["has_market"]].copy()
+            if not silver_only.empty:
+                silver_only = silver_only.merge(
+                    model_lookup[["ID", "Pred"]].rename(columns={"Pred": "model_pred"}),
+                    on="ID",
+                    how="left",
+                )
+                silver_only["silver_direct_share"] = silver_only["silver_round"].map(
+                    lambda round_name: silver_direct_share_for_round(
+                        round_name,
+                        first_four_share=0.35,
+                        round64_share=0.60,
                     )
-                    silver_only["silver_direct_share"] = silver_only["silver_round"].map(
-                        lambda round_name: silver_direct_share_for_round(
-                            round_name,
-                            first_four_share=0.35,
-                            round64_share=0.60,
-                        )
-                    )
-                    silver_only["Pred"] = (
-                        (1.0 - silver_only["silver_direct_share"]) * silver_only["model_pred"]
-                        + silver_only["silver_direct_share"] * silver_only["p_low_silver"]
-                    )
-                    seeded_lookup = seeded_lookup.merge(
-                        silver_only[["ID", "Pred"]].rename(columns={"Pred": "silver_pred"}),
-                        on="ID",
-                        how="left",
-                    )
-                    seeded_lookup["Pred"] = seeded_lookup["silver_pred"].fillna(seeded_lookup["Pred"])
-                    seeded_lookup = seeded_lookup.drop(columns=["silver_pred"])
-                    summary["silver_only_overrides"] = int(len(silver_only))
+                )
+                silver_only["Pred"] = (
+                    (1.0 - silver_only["silver_direct_share"]) * silver_only["model_pred"]
+                    + silver_only["silver_direct_share"] * silver_only["p_low_silver"]
+                )
+                model_lookup = model_lookup.merge(
+                    silver_only[["ID", "Pred"]].rename(columns={"Pred": "silver_pred"}),
+                    on="ID",
+                    how="left",
+                )
+                model_lookup["Pred"] = model_lookup["silver_pred"].fillna(model_lookup["Pred"])
+                model_lookup = model_lookup.drop(columns=["silver_pred"])
+                summary["silver_only_overrides"] = int(len(silver_only))
 
         side_pred = side_pred.set_index("ID")
-        side_pred.loc[seeded_lookup["ID"], "Pred"] = seeded_lookup.set_index("ID")["Pred"]
+        side_pred.loc[model_lookup["ID"], "Pred"] = model_lookup.set_index("ID")["Pred"]
         side_pred = side_pred.reset_index()
-        summary["seeded_overrides"] = int(len(seeded_lookup))
+        summary["latent_layer_rows"] = int(len(model_lookup))
 
         if not market.empty:
             if not silver.empty:
@@ -459,7 +468,7 @@ def _predict_side(sample_pairs: pd.DataFrame, side_code: str) -> tuple[pd.DataFr
                     how="left",
                 )
             market = market.merge(
-                seeded_lookup[["ID", "Pred"]].rename(columns={"Pred": "model_pred"}),
+                model_lookup[["ID", "Pred"]].rename(columns={"Pred": "model_pred"}),
                 on="ID",
                 how="left",
             )
@@ -493,19 +502,27 @@ def _predict_side(sample_pairs: pd.DataFrame, side_code: str) -> tuple[pd.DataFr
                 summary["market_overrides"] = int(len(market))
 
     side_pred["Pred"] = side_pred["Pred"].clip(0.001, 0.999)
-    return side_pred, summary
+    return side_pred[["ID", "Pred"]], summary
 
 
 def main() -> None:
     ensure_output_dirs()
+    args = _parse_args()
 
     sample = pd.read_csv(DATA_DIR / "SampleSubmissionStage2.csv")
     sample_pairs = parse_submission_ids(sample["ID"])
+    prior_predictions, prior_summary = _load_or_build_prior(
+        sample["ID"],
+        prior_path=args.prior_path,
+        refresh_prior=args.refresh_prior,
+        use_cache=not args.no_cache,
+        refresh_cache=args.refresh_cache,
+    )
 
     predictions = []
     summaries = []
     for side_code in ("M", "W"):
-        side_pred, summary = _predict_side(sample_pairs, side_code)
+        side_pred, summary = _predict_side(sample_pairs, prior_predictions, side_code)
         predictions.append(side_pred)
         summaries.append(summary)
 
@@ -515,8 +532,16 @@ def main() -> None:
         .reindex(sample["ID"])
         .reset_index()
     )
+    submission["Pred"] = submission["Pred"].round(6)
     submission.to_csv(OUTPUT_PATH, index=False)
-    SUMMARY_PATH.write_text(json.dumps({"season": SEASON, "summaries": summaries}, indent=2) + "\n")
+
+    payload = {
+        "season": SEASON,
+        "base_model": "modeh7",
+        "prior": prior_summary,
+        "summaries": summaries,
+    }
+    SUMMARY_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 if __name__ == "__main__":

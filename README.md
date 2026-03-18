@@ -1,163 +1,152 @@
 # March Machine Learning Mania 2026
 
-March Madness probability modeling. I incorporate both the Kaggle data (For all matchups), Vegas odds, and Nate Silver's projections (For R64 matchups). 
+This repo builds one final submission path for Kaggle March Machine Learning Mania 2026.
 
-## What This Repo Does
+The statistical core is a pooled men+women notebook-style model inspired by the 2025 public modeh7 solution:
 
-- Builds end-of-regular-season team features from the Kaggle data. Features are just a fancy way of saying all the different metrics Kaggle provides (Off. efficiency, Point differencial, etc)
-- Tunes simple pairwise tournament models against rolling historical Brier. This means we build all head to head tournament matchups, then tune the parameters to MINIMIZE the brier score on past tournaments. 
-- Builds a live tournament submission that combines the prior, the seeded tournament model, Silver predictions, and posted moneylines.
+- symmetric doubled training rows for every game
+- tournament seed features
+- season-average box-score and opponent box-score features
+- season-reset Elo
+- per-season Gaussian GLM team quality
+- XGBoost regression on point differential
+- spline calibration from predicted margin to win probability
 
-The current strongest men’s seeded baseline is:
+That model produces the model-only baseline in `outputs/submissions/prior_submission_2026.csv`.
 
-- `seed_matchup_prior`
-- `seed_num_diff`
-- `adj_margin_rating_diff`
-- `recent_margin_diff`
+The competition submission in `outputs/submissions/live_submission_2026.csv` starts from that XGBoost prior, then applies the men-only tournament layer built from posted moneylines, optional BPI inputs, and optional Nate Silver probabilities.
 
-## Current Backtests
+## Trimmed Repo Layout
 
-Rolling tournament-only Brier on `2021-2025`:
+Only the active files for the final pipeline remain:
 
-- Men prior: `0.1970`
-- Men seeded: `0.1935`
-- Women prior: `0.1427`
-- Women seeded: `0.1404`
+- `src/mmmania/modeh7.py`: pooled men+women XGBoost prior model
+- `src/mmmania/tournament.py`: men-only latent tournament rating layer
+- `src/mmmania/odds.py`: moneyline conversion and consensus helpers
+- `src/mmmania/silver.py`: Nate Silver import and pair-probability mapping
+- `src/mmmania/features.py`: active-team and tournament-seed loaders
+- `src/mmmania/modeling.py`: submission ID parsing and target backtest seasons
+- `src/mmmania/matchup_lookup.py`: bundle builder for the HTML probability viewer
+- `scripts/`: final build entry points only
+- `templates/tournament_moneylines_template.csv`: the only retained schema template
+- `tests/`: coverage for the active modules only
 
-Detailed results live in [outputs/reports/rolling_backtests.md](/outputs/reports/rolling_backtests.md).
+Old snapshot exporters, external-feature scaffolding, and scratch docs were removed.
 
-## Repo Layout
+## Optimal Path
 
-- `data/`: raw Kaggle CSVs
-- `context/`: competition rules, dataset notes, and strategy docs
-- `src/mmmania/`: loaders, features, modeling, odds helpers
-- `scripts/`: runnable entry points
-- `templates/`: schemas for future external inputs
-- `outputs/`: generated reports, features, submissions
-- `context/plan.md`: high-level competition strategy
+This repo is now XGBoost-only.
 
-## Commands
+Current tuned defaults for the prior:
 
-Run tests:
+- validation: `loso`
+- calibration: `by_gender`
+- aggressiveness: `1.01`
+- XGBoost: `eta 0.008`, `max_depth 3`, `min_child_weight 6`, `subsample 0.7`, `colsample_bynode 0.7`, `num_parallel_tree 2`, `num_rounds 900`
+
+Latest saved audit in `outputs/reports/rolling_backtests.md`:
+
+- fair rolling `2021-2025`: `0.1675` overall, `0.1937` men, `0.1410` women
+- notebook-style LOSO `2021-2025`: `0.1676` overall, `0.1955` men, `0.1394` women
+- notebook-style LOSO full history: `0.1680` overall, `0.1857` men, `0.1412` women
+
+## Mac XGBoost Setup
+
+The build should run under a Python where `xgboost` is installed and linked against `libomp`.
+
+If needed:
+
+```bash
+brew install libomp
+```
+
+Before running the full build, export the Homebrew OpenMP path:
+
+```bash
+export DYLD_LIBRARY_PATH=/opt/homebrew/opt/libomp/lib:$DYLD_LIBRARY_PATH
+export DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/libomp/lib:$DYLD_FALLBACK_LIBRARY_PATH
+```
+
+Quick runtime probe:
+
+```bash
+python -c "import sys; from pathlib import Path; sys.path.insert(0, str(Path('src').resolve())); import mmmania.modeh7 as m; print(m._xgboost_probe_error())"
+```
+
+Expected result:
+
+```python
+None
+```
+
+If the probe returns an error, do not run the final build yet. Fix the Python/XGBoost/libomp environment first.
+
+## What The Scripts Do
+
+- `scripts/run_backtests.py`: rebuilds the fair rolling and notebook-style LOSO audits
+- `scripts/build_prior_submission.py`: trains the XGBoost prior and writes the model-only Kaggle submission
+- `scripts/build_market_consensus.py`: converts posted moneylines into no-vig market probabilities
+- `scripts/build_live_submission.py`: blends the XGBoost prior with the men tournament layer and writes the final submission
+- `scripts/build_mens_tournament_board.py`: exports a readable board for posted men’s games
+- `scripts/build_matchup_lookup_tool.py`: builds the self-contained HTML matchup viewer from the live submission
+
+## Full Build
+
+Run from the repo root:
 
 ```bash
 pytest -q
-```
-
-Rebuild backtests:
-
-```bash
 python scripts/run_backtests.py
-```
-
-Export 2026 team snapshots:
-
-```bash
-python scripts/export_feature_snapshots.py
-```
-
-Build the current pre-bracket prior submission:
-
-```bash
 python scripts/build_prior_submission.py
-```
-
-Build the current live hybrid submission:
-
-```bash
-python scripts/build_live_submission.py
-```
-
-Build market consensus once real odds exist:
-
-```bash
 python scripts/build_market_consensus.py
-```
-
-Build the live men’s board for posted tournament games:
-
-```bash
+python scripts/build_live_submission.py
 python scripts/build_mens_tournament_board.py
-```
-
-Build the simple team-name matchup lookup tool:
-
-```bash
 python scripts/build_matchup_lookup_tool.py
 ```
 
-Full rebuild from raw Kaggle files to both submission artifacts:
+If you want the live build to force a fresh prior instead of reusing `outputs/submissions/prior_submission_2026.csv`:
 
 ```bash
-pytest -q
-python scripts/export_feature_snapshots.py
-python scripts/run_backtests.py
-python scripts/build_prior_submission.py
-python scripts/build_market_consensus.py
-python scripts/build_live_submission.py
-python scripts/build_mens_tournament_board.py
-python scripts/build_matchup_lookup_tool.py
+python scripts/build_live_submission.py --refresh-prior
 ```
 
-Prior-only rebuild:
+## Submit
 
-```bash
-pytest -q
-python scripts/export_feature_snapshots.py
-python scripts/run_backtests.py
-python scripts/build_prior_submission.py
-```
+Submit:
+
+- `outputs/submissions/live_submission_2026.csv`
+
+Do not submit the prior unless you explicitly want the model-only baseline.
+
+Before uploading, verify `outputs/reports/prior_submission_summary_2026.json` contains:
+
+- `"backend": "xgboost"`
+
+and that `outputs/reports/live_submission_summary_2026.json` was rebuilt in the same run.
 
 ## External Inputs
-
-Optional historical/current rating features:
-
-- input: `inputs/external/team_features.csv`
-- schema: `templates/external_team_features_template.csv`
-
-Any numeric columns in that file are merged automatically as model features.
 
 Tournament moneylines:
 
 - input: `inputs/odds/tournament_moneylines.csv`
 - schema: `templates/tournament_moneylines_template.csv`
 
-Optional men-only BPI straight-up probabilities for posted games:
+Optional men-only BPI probabilities:
 
 - input: `inputs/odds/men_bpi_probabilities.csv`
 
-Optional men-only Nate Silver forecast files for the first four and round of 64:
+Optional men-only Nate Silver files:
 
 - input directory: `data/silver/`
-
-The market script converts American moneylines to no-vig consensus probabilities for the lower `TeamID`.
-
-In the current setup, posted moneylines are the only live market input used by the final submission pipeline.
-
-Silver and BPI are additional men-only external forecast sources used inside the live tournament layer and the direct posted-game overrides.
 
 ## Main Outputs
 
 - `outputs/backtests/rolling_backtests.json`
 - `outputs/reports/rolling_backtests.md`
-- `outputs/features/men_team_features_2026.csv`
-- `outputs/features/women_team_features_2026.csv`
+- `outputs/reports/prior_submission_summary_2026.json`
+- `outputs/reports/live_submission_summary_2026.json`
 - `outputs/markets/market_consensus.csv`
 - `outputs/markets/men_tournament_board_2026.csv`
 - `outputs/submissions/prior_submission_2026.csv`
 - `outputs/submissions/live_submission_2026.csv`
 - `outputs/tools/matchup_lookup_2026.html`
-- `outputs/reports/live_submission_summary_2026.json`
-
-`prior_submission_2026.csv` is only a fallback baseline. It does not use real 2026 seeds or live odds.
-
-`live_submission_2026.csv` is the current competition-ready artifact:
-
-- prior model for all teams,
-- seeded model for tournament-team pairs,
-- a men-only tournament rating layer that uses seeded probabilities, posted moneylines, optional Nate Silver probabilities, and optional BPI win probabilities,
-- market-primary overrides for posted games, with an intentionally heavier Silver contribution on men’s Round of 64 rows so strong Silver positions also influence downstream later-round matchups.
-
-`men_tournament_board_2026.csv` compares the seeded model, current submission probability, and market on posted men’s games.
-
-`matchup_lookup_2026.html` is a small self-contained browser tool that lets you type two team names and see the exact matchup probability from `live_submission_2026.csv`.

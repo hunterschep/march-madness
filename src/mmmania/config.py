@@ -16,7 +16,6 @@ OUTPUT_DIR = ROOT / "outputs"
 class CompetitionSide:
     code: str
     label: str
-    uses_massey: bool
     team_file: str
     conference_file: str
 
@@ -25,14 +24,12 @@ SIDES = {
     "M": CompetitionSide(
         code="M",
         label="men",
-        uses_massey=True,
         team_file="MTeams.csv",
         conference_file="MTeamConferences.csv",
     ),
     "W": CompetitionSide(
         code="W",
         label="women",
-        uses_massey=False,
         team_file="WTeams.csv",
         conference_file="WTeamConferences.csv",
     ),
@@ -49,8 +46,8 @@ def ensure_output_dirs() -> None:
     for path in [
         OUTPUT_DIR,
         OUTPUT_DIR / "backtests",
+        OUTPUT_DIR / "cache",
         OUTPUT_DIR / "submissions",
-        OUTPUT_DIR / "features",
         OUTPUT_DIR / "markets",
         OUTPUT_DIR / "reports",
     ]:
